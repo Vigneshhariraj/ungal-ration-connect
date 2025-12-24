@@ -13,12 +13,18 @@ import {
   Shield, 
   LogOut,
   ChevronRight,
-  Camera
+  Camera,
+  Pencil,
+  Save,
+  X,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,11 +35,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -44,6 +64,25 @@ const ProfilePage = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    phone: user?.phone || '',
+    email: user?.email || '',
+    wardNumber: user?.wardNumber?.toString() || '1',
+  });
+  const [editErrors, setEditErrors] = useState<{ phone?: string; email?: string }>({});
+  
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordErrors, setPasswordErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -63,12 +102,90 @@ const ProfilePage = () => {
     setLanguage(language === 'en' ? 'ta' : 'en');
   };
 
-  const profileDetails = [
-    { icon: Phone, label: language === 'en' ? 'Phone' : 'தொலைபேசி', value: `+91 ${user?.phone}` },
-    { icon: Mail, label: language === 'en' ? 'Email' : 'மின்னஞ்சல்', value: user?.email },
-    { icon: MapPin, label: language === 'en' ? 'Ward' : 'வார்டு', value: `Ward ${user?.wardNumber}` },
-    { icon: CreditCard, label: t('rationCard.number'), value: user?.rationCardNumber },
-  ];
+  const validatePhone = (phone: string): boolean => {
+    const phoneRegex = /^[0-9]{10}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleStartEdit = () => {
+    setEditForm({
+      phone: user?.phone || '',
+      email: user?.email || '',
+      wardNumber: user?.wardNumber?.toString() || '1',
+    });
+    setEditErrors({});
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditErrors({});
+  };
+
+  const handleSaveChanges = async () => {
+    const errors: { phone?: string; email?: string } = {};
+    
+    if (!validatePhone(editForm.phone)) {
+      errors.phone = language === 'en' ? 'Phone must be 10 digits' : 'தொலைபேசி 10 இலக்கங்கள் இருக்க வேண்டும்';
+    }
+    
+    if (!validateEmail(editForm.email)) {
+      errors.email = language === 'en' ? 'Invalid email format' : 'தவறான மின்னஞ்சல் வடிவம்';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      return;
+    }
+
+    setIsSaving(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSaving(false);
+
+    toast({
+      title: language === 'en' ? 'Profile updated successfully' : 'சுயவிவரம் வெற்றிகரமாக புதுப்பிக்கப்பட்டது',
+    });
+
+    setIsEditing(false);
+  };
+
+  const handleChangePassword = async () => {
+    const errors: { current?: string; new?: string; confirm?: string } = {};
+
+    if (!passwordForm.currentPassword) {
+      errors.current = language === 'en' ? 'Current password is required' : 'தற்போதைய கடவுச்சொல் தேவை';
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      errors.new = language === 'en' ? 'Password must be at least 6 characters' : 'கடவுச்சொல் குறைந்தது 6 எழுத்துக்கள் இருக்க வேண்டும்';
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      errors.confirm = language === 'en' ? 'Passwords do not match' : 'கடவுச்சொற்கள் பொருந்தவில்லை';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors);
+      return;
+    }
+
+    setIsSaving(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSaving(false);
+
+    toast({
+      title: language === 'en' ? 'Password changed successfully' : 'கடவுச்சொல் வெற்றிகரமாக மாற்றப்பட்டது',
+    });
+
+    setShowPasswordDialog(false);
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordErrors({});
+  };
 
   const settingsItems = [
     {
@@ -106,6 +223,9 @@ const ProfilePage = () => {
     },
   ];
 
+  // Generate ward options 1-100
+  const wardOptions = Array.from({ length: 100 }, (_, i) => i + 1);
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -141,22 +261,127 @@ const ProfilePage = () => {
         {/* Profile Details */}
         <Card className="animate-slide-up" style={{ animationDelay: '50ms' }}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">
-              {language === 'en' ? 'Personal Details' : 'தனிப்பட்ட விவரங்கள்'}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">
+                {language === 'en' ? 'Personal Details' : 'தனிப்பட்ட விவரங்கள்'}
+              </CardTitle>
+              {!isEditing ? (
+                <Button variant="outline" size="sm" onClick={handleStartEdit}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  {language === 'en' ? 'Edit Profile' : 'திருத்து'}
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={isSaving}>
+                    <X className="w-4 h-4 mr-1" />
+                    {t('common.cancel')}
+                  </Button>
+                  <Button size="sm" onClick={handleSaveChanges} disabled={isSaving}>
+                    <Save className="w-4 h-4 mr-1" />
+                    {isSaving ? t('common.loading') : (language === 'en' ? 'Save Changes' : 'சேமி')}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {profileDetails.map((detail, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center">
-                  <detail.icon className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">{detail.label}</p>
-                  <p className="font-medium truncate">{detail.value || '-'}</p>
-                </div>
+            {/* Phone */}
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center">
+                <Phone className="w-5 h-5 text-muted-foreground" />
               </div>
-            ))}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">{language === 'en' ? 'Phone' : 'தொலைபேசி'}</p>
+                {isEditing ? (
+                  <div>
+                    <Input
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      placeholder="9876543210"
+                      className="h-8 mt-1"
+                      maxLength={10}
+                    />
+                    {editErrors.phone && <p className="text-xs text-destructive mt-1">{editErrors.phone}</p>}
+                  </div>
+                ) : (
+                  <p className="font-medium truncate">+91 {user?.phone || '-'}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center">
+                <Mail className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">{language === 'en' ? 'Email' : 'மின்னஞ்சல்'}</p>
+                {isEditing ? (
+                  <div>
+                    <Input
+                      type="email"
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      placeholder="email@example.com"
+                      className="h-8 mt-1"
+                    />
+                    {editErrors.email && <p className="text-xs text-destructive mt-1">{editErrors.email}</p>}
+                  </div>
+                ) : (
+                  <p className="font-medium truncate">{user?.email || '-'}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Ward */}
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">{language === 'en' ? 'Ward' : 'வார்டு'}</p>
+                {isEditing ? (
+                  <Select
+                    value={editForm.wardNumber}
+                    onValueChange={(value) => setEditForm({ ...editForm, wardNumber: value })}
+                  >
+                    <SelectTrigger className="h-8 mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wardOptions.map((ward) => (
+                        <SelectItem key={ward} value={ward.toString()}>
+                          Ward {ward}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="font-medium truncate">Ward {user?.wardNumber || '-'}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Ration Card (Read Only) */}
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">{t('rationCard.number')}</p>
+                <p className="font-medium truncate">{user?.rationCardNumber || '-'}</p>
+              </div>
+            </div>
+
+            {/* Change Password Button */}
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => setShowPasswordDialog(true)}
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              {language === 'en' ? 'Change Password' : 'கடவுச்சொல்லை மாற்று'}
+            </Button>
           </CardContent>
         </Card>
 
@@ -221,6 +446,60 @@ const ProfilePage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Change Password Dialog */}
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lock className="w-5 h-5" />
+                {language === 'en' ? 'Change Password' : 'கடவுச்சொல்லை மாற்று'}
+              </DialogTitle>
+              <DialogDescription>
+                {language === 'en' 
+                  ? 'Enter your current password and choose a new password.'
+                  : 'உங்கள் தற்போதைய கடவுச்சொல்லை உள்ளிட்டு புதிய கடவுச்சொல்லைத் தேர்ந்தெடுக்கவும்.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>{language === 'en' ? 'Current Password' : 'தற்போதைய கடவுச்சொல்'}</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                />
+                {passwordErrors.current && <p className="text-xs text-destructive">{passwordErrors.current}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>{language === 'en' ? 'New Password' : 'புதிய கடவுச்சொல்'}</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                />
+                {passwordErrors.new && <p className="text-xs text-destructive">{passwordErrors.new}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>{language === 'en' ? 'Confirm New Password' : 'புதிய கடவுச்சொல்லை உறுதிப்படுத்து'}</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                />
+                {passwordErrors.confirm && <p className="text-xs text-destructive">{passwordErrors.confirm}</p>}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)} disabled={isSaving}>
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={handleChangePassword} disabled={isSaving}>
+                {isSaving ? t('common.loading') : (language === 'en' ? 'Change Password' : 'மாற்று')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

@@ -1,18 +1,76 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Phone, MapPin, Calendar, Clock, User, CheckCircle, Truck } from 'lucide-react';
+import { 
+  Heart, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  Clock, 
+  User, 
+  CheckCircle, 
+  Truck, 
+  Smartphone,
+  AlertCircle,
+  XCircle,
+  ChevronRight
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import MainLayout from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { mockDeliveryRequests } from '@/data/mockData';
+import { cn } from '@/lib/utils';
+
+interface FamilyMember {
+  id: string;
+  name: string;
+  age: number;
+  relation: string;
+  isElderly: boolean;
+}
+
+// Dummy data for eligibility check
+const getRationCardEligibility = (cardNumber: string): { 
+  eligible: boolean; 
+  elderlyMembers: FamilyMember[];
+  cardHolderName: string;
+} => {
+  if (cardNumber === 'TN1234567891' || cardNumber.startsWith('TN12345678')) {
+    return {
+      eligible: false,
+      elderlyMembers: [],
+      cardHolderName: 'Arun Kumar',
+    };
+  }
+  
+  if (cardNumber === 'TN2345678912' || cardNumber.startsWith('TN23456789')) {
+    return {
+      eligible: true,
+      elderlyMembers: [
+        { id: 'e1', name: 'Lakshmi Devi', age: 72, relation: 'Mother', isElderly: true },
+        { id: 'e2', name: 'Krishnan', age: 75, relation: 'Father', isElderly: true },
+      ],
+      cardHolderName: 'Rajesh Kumar',
+    };
+  }
+
+  // Default: Show 1 elderly member
+  return {
+    eligible: true,
+    elderlyMembers: [
+      { id: 'e1', name: 'Grandmother Parvathi', age: 68, relation: 'Grandmother', isElderly: true },
+    ],
+    cardHolderName: 'Verified Card Holder',
+  };
+};
+
+type Step = 'input' | 'eligibility' | 'service' | 'otp_setup' | 'delivery' | 'status';
 
 const ElderServicesPage = () => {
   const navigate = useNavigate();
@@ -20,10 +78,12 @@ const ElderServicesPage = () => {
   const { t, language } = useLanguage();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<'verification' | 'members' | 'service' | 'delivery' | 'status'>('verification');
+  const [step, setStep] = useState<Step>('input');
   const [rationCard, setRationCard] = useState(user?.rationCardNumber || '');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [eligibilityData, setEligibilityData] = useState<ReturnType<typeof getRationCardEligibility> | null>(null);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [serviceType, setServiceType] = useState<'otp' | 'delivery'>('delivery');
+  const [serviceType, setServiceType] = useState<'otp' | 'delivery' | null>(null);
   const [deliveryForm, setDeliveryForm] = useState({
     address: '',
     date: '',
@@ -31,17 +91,22 @@ const ElderServicesPage = () => {
     contact: user?.phone || '',
     notes: '',
   });
+  const [otpPhone, setOtpPhone] = useState(user?.phone || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const familyMembers = user?.familyMembers || [];
-  const elderlyMembers = familyMembers.filter(m => m.isElderly);
-
-  const handleVerify = () => {
+  const handleVerifyCard = async () => {
     if (!rationCard) {
       toast({ title: 'Error', description: 'Please enter ration card number', variant: 'destructive' });
       return;
     }
-    setStep('members');
+
+    setIsVerifying(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const result = getRationCardEligibility(rationCard.toUpperCase());
+    setEligibilityData(result);
+    setIsVerifying(false);
+    setStep('eligibility');
   };
 
   const handleMemberToggle = (memberId: string) => {
@@ -50,7 +115,36 @@ const ElderServicesPage = () => {
     );
   };
 
-  const handleSubmitRequest = async () => {
+  const handleServiceSelect = (type: 'otp' | 'delivery') => {
+    setServiceType(type);
+    if (type === 'otp') {
+      setStep('otp_setup');
+    } else {
+      setStep('delivery');
+    }
+  };
+
+  const handleSubmitOTPService = async () => {
+    if (!otpPhone || otpPhone.length !== 10) {
+      toast({ title: 'Error', description: 'Please enter a valid 10-digit phone number', variant: 'destructive' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsSubmitting(false);
+
+    toast({
+      title: language === 'en' ? 'OTP Service Enabled!' : 'OTP சேவை இயக்கப்பட்டது!',
+      description: language === 'en' 
+        ? 'OTP-based authentication has been set up successfully.' 
+        : 'OTP அடிப்படையிலான அங்கீகாரம் வெற்றிகரமாக அமைக்கப்பட்டது.',
+    });
+
+    setStep('status');
+  };
+
+  const handleSubmitDeliveryRequest = async () => {
     if (!deliveryForm.address || !deliveryForm.date || !deliveryForm.time) {
       toast({ title: 'Error', description: 'Please fill all required fields', variant: 'destructive' });
       return;
@@ -94,8 +188,8 @@ const ElderServicesPage = () => {
           </CardContent>
         </Card>
 
-        {/* Step 1: Verification */}
-        {step === 'verification' && (
+        {/* Step 1: Enter Ration Card Number */}
+        {step === 'input' && (
           <Card className="animate-slide-up">
             <CardHeader>
               <CardTitle className="text-lg">{t('elder.verification')}</CardTitle>
@@ -109,124 +203,232 @@ const ElderServicesPage = () => {
                   placeholder="TN123456789012"
                   className="uppercase"
                 />
+                <p className="text-xs text-muted-foreground">
+                  {language === 'en' 
+                    ? 'Enter your ration card number to check eligibility for elder services'
+                    : 'மூத்தோர் சேவைகளுக்கான தகுதியை சரிபார்க்க உங்கள் ரேஷன் கார்டு எண்ணை உள்ளிடவும்'}
+                </p>
               </div>
-              <Button className="w-full" onClick={handleVerify}>
-                {language === 'en' ? 'Verify & Continue' : 'சரிபார்த்து தொடரவும்'}
+              <Button className="w-full" onClick={handleVerifyCard} disabled={isVerifying}>
+                {isVerifying ? t('common.loading') : (language === 'en' ? 'Check Eligibility' : 'தகுதியை சரிபார்க்கவும்')}
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 2: Select Members */}
-        {step === 'members' && (
+        {/* Step 2: Eligibility Result */}
+        {step === 'eligibility' && eligibilityData && (
           <Card className="animate-slide-up">
-            <CardHeader>
-              <CardTitle className="text-lg">{t('elder.selectMembers')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {elderlyMembers.length > 0 ? (
-                <div className="space-y-3">
-                  {elderlyMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer"
-                      onClick={() => handleMemberToggle(member.id)}
-                    >
-                      <Checkbox
-                        checked={selectedMembers.includes(member.id)}
-                        onCheckedChange={() => handleMemberToggle(member.id)}
-                      />
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{member.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {member.age} years • {member.relation}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+            <CardContent className="p-6">
+              {!eligibilityData.eligible ? (
+                // Not Eligible
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {language === 'en' ? 'No Elderly Members' : 'மூத்த உறுப்பினர்கள் இல்லை'}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    {language === 'en' 
+                      ? `The ration card ${rationCard} does not have any elderly members (age 60+) registered. Elder services are only available for families with elderly or disabled members.`
+                      : `ரேஷன் கார்டு ${rationCard} இல் 60+ வயதுடைய மூத்த உறுப்பினர்கள் எவரும் பதிவு செய்யப்படவில்லை.`}
+                  </p>
+                  <div className="p-4 bg-muted rounded-lg text-left mb-4">
+                    <p className="text-sm text-muted-foreground mb-1">{language === 'en' ? 'Card Holder' : 'கார்டு வைத்திருப்பவர்'}</p>
+                    <p className="font-medium">{eligibilityData.cardHolderName}</p>
+                  </div>
+                  <Button variant="outline" className="w-full" onClick={() => setStep('input')}>
+                    {language === 'en' ? 'Try Different Card' : 'வேறு கார்டை முயற்சிக்கவும்'}
+                  </Button>
                 </div>
               ) : (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground">
-                    {language === 'en' 
-                      ? 'No elderly members found in your family.'
-                      : 'உங்கள் குடும்பத்தில் மூத்த உறுப்பினர்கள் இல்லை.'}
-                  </p>
+                // Eligible
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-success" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">
+                        {language === 'en' 
+                          ? `${eligibilityData.elderlyMembers.length} Elderly Members Found`
+                          : `${eligibilityData.elderlyMembers.length} மூத்த உறுப்பினர்கள் கண்டறியப்பட்டனர்`}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {language === 'en' ? 'Card Holder: ' : 'கார்டு வைத்திருப்பவர்: '}{eligibilityData.cardHolderName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <Label>{language === 'en' ? 'Select Elderly Members' : 'மூத்த உறுப்பினர்களைத் தேர்ந்தெடுக்கவும்'}</Label>
+                    {eligibilityData.elderlyMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors",
+                          selectedMembers.includes(member.id) ? "border-primary bg-primary/5" : "hover:bg-muted"
+                        )}
+                        onClick={() => handleMemberToggle(member.id)}
+                      >
+                        <Checkbox
+                          checked={selectedMembers.includes(member.id)}
+                          onCheckedChange={() => handleMemberToggle(member.id)}
+                        />
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{member.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {member.age} {language === 'en' ? 'years' : 'வயது'} • {member.relation}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => setStep('input')}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button 
+                      className="flex-1" 
+                      onClick={() => setStep('service')}
+                      disabled={selectedMembers.length === 0}
+                    >
+                      {language === 'en' ? 'Continue' : 'தொடரவும்'}
+                    </Button>
+                  </div>
                 </div>
               )}
-
-              <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setStep('verification')}>
-                  {t('common.cancel')}
-                </Button>
-                <Button className="flex-1" onClick={() => setStep('service')}>
-                  {language === 'en' ? 'Continue' : 'தொடரவும்'}
-                </Button>
-              </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 3: Select Service */}
+        {/* Step 3: Select Service Type */}
         {step === 'service' && (
+          <div className="space-y-4 animate-slide-up">
+            <h3 className="text-lg font-semibold">
+              {language === 'en' ? 'Select Service Type' : 'சேவை வகையைத் தேர்ந்தெடுக்கவும்'}
+            </h3>
+
+            {/* OTP Service Card */}
+            <Card 
+              className="cursor-pointer hover:border-primary transition-colors"
+              onClick={() => handleServiceSelect('otp')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Smartphone className="w-7 h-7 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold">{t('elder.otpAuth')}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {language === 'en' 
+                        ? 'Use OTP instead of biometric for ration collection'
+                        : 'ரேஷன் சேகரிப்பிற்கு பயோமெட்ரிக்கிற்கு பதிலாக OTP பயன்படுத்தவும்'}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Home Delivery Card */}
+            <Card 
+              className="cursor-pointer hover:border-primary transition-colors"
+              onClick={() => handleServiceSelect('delivery')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center">
+                    <Truck className="w-7 h-7 text-accent" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold">{t('elder.homeDelivery')}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {language === 'en' 
+                        ? 'Request home delivery for elderly or disabled members'
+                        : 'மூத்த அல்லது ஊனமுற்ற உறுப்பினர்களுக்கு வீட்டு டெலிவரி கோரவும்'}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button variant="outline" className="w-full" onClick={() => setStep('eligibility')}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        )}
+
+        {/* Step 4a: OTP Setup Form */}
+        {step === 'otp_setup' && (
           <Card className="animate-slide-up">
             <CardHeader>
-              <CardTitle className="text-lg">
-                {language === 'en' ? 'Select Service' : 'சேவையைத் தேர்ந்தெடுக்கவும்'}
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Smartphone className="w-5 h-5" />
+                {language === 'en' ? 'Setup OTP Authentication' : 'OTP அங்கீகாரத்தை அமைக்கவும்'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <RadioGroup value={serviceType} onValueChange={(v) => setServiceType(v as 'otp' | 'delivery')}>
-                <div className="flex items-center space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                  onClick={() => setServiceType('otp')}>
-                  <RadioGroupItem value="otp" id="otp" />
-                  <div className="flex-1">
-                    <Label htmlFor="otp" className="font-medium cursor-pointer">
-                      {t('elder.otpAuth')}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {language === 'en' 
-                        ? 'Use OTP instead of biometric verification'
-                        : 'பயோமெட்ரிக் சரிபார்ப்புக்கு பதிலாக OTP பயன்படுத்தவும்'}
-                    </p>
-                  </div>
-                </div>
+              <p className="text-sm text-muted-foreground">
+                {language === 'en' 
+                  ? 'Register a phone number to receive OTP during ration collection. This will replace biometric verification.'
+                  : 'ரேஷன் சேகரிப்பின் போது OTP பெற ஒரு தொலைபேசி எண்ணை பதிவு செய்யுங்கள்.'}
+              </p>
 
-                <div className="flex items-center space-x-3 p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                  onClick={() => setServiceType('delivery')}>
-                  <RadioGroupItem value="delivery" id="delivery" />
-                  <div className="flex-1">
-                    <Label htmlFor="delivery" className="font-medium cursor-pointer">
-                      {t('elder.homeDelivery')}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {language === 'en' 
-                        ? 'Get ration delivered to your doorstep'
-                        : 'உங்கள் வீட்டு வாசலில் ரேஷன் பெறுங்கள்'}
-                    </p>
-                  </div>
+              <div className="space-y-2">
+                <Label>{language === 'en' ? 'Phone Number for OTP' : 'OTP க்கான தொலைபேசி எண்'}</Label>
+                <div className="flex gap-2">
+                  <span className="flex items-center px-3 bg-muted rounded-l-md border border-r-0 text-muted-foreground">
+                    +91
+                  </span>
+                  <Input
+                    type="tel"
+                    value={otpPhone}
+                    onChange={(e) => setOtpPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="9876543210"
+                    className="rounded-l-none"
+                    maxLength={10}
+                  />
                 </div>
-              </RadioGroup>
+              </div>
+
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  {language === 'en' 
+                    ? 'Selected members for OTP service:'
+                    : 'OTP சேவைக்குத் தேர்ந்தெடுக்கப்பட்ட உறுப்பினர்கள்:'}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {eligibilityData?.elderlyMembers
+                    .filter(m => selectedMembers.includes(m.id))
+                    .map(m => (
+                      <span key={m.id} className="px-2 py-1 bg-primary/10 text-primary text-sm rounded-full">
+                        {m.name}
+                      </span>
+                    ))}
+                </div>
+              </div>
 
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setStep('members')}>
+                <Button variant="outline" className="flex-1" onClick={() => setStep('service')}>
                   {t('common.cancel')}
                 </Button>
-                <Button 
-                  className="flex-1" 
-                  onClick={() => serviceType === 'delivery' ? setStep('delivery') : setStep('status')}
-                >
-                  {language === 'en' ? 'Continue' : 'தொடரவும்'}
+                <Button className="flex-1" onClick={handleSubmitOTPService} disabled={isSubmitting}>
+                  {isSubmitting ? t('common.loading') : (language === 'en' ? 'Enable OTP Service' : 'OTP சேவையை இயக்கு')}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 4: Delivery Form */}
+        {/* Step 4b: Delivery Form */}
         {step === 'delivery' && (
           <Card className="animate-slide-up">
             <CardHeader>
@@ -282,11 +484,26 @@ const ElderServicesPage = () => {
                 />
               </div>
 
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  {language === 'en' ? 'Delivery for elderly members:' : 'மூத்த உறுப்பினர்களுக்கான டெலிவரி:'}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {eligibilityData?.elderlyMembers
+                    .filter(m => selectedMembers.includes(m.id))
+                    .map(m => (
+                      <span key={m.id} className="px-2 py-1 bg-primary/10 text-primary text-sm rounded-full">
+                        {m.name}
+                      </span>
+                    ))}
+                </div>
+              </div>
+
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setStep('service')}>
                   {t('common.cancel')}
                 </Button>
-                <Button className="flex-1" onClick={handleSubmitRequest} disabled={isSubmitting}>
+                <Button className="flex-1" onClick={handleSubmitDeliveryRequest} disabled={isSubmitting}>
                   {isSubmitting ? t('common.loading') : t('elder.submit')}
                 </Button>
               </div>
@@ -302,15 +519,21 @@ const ElderServicesPage = () => {
                 <CheckCircle className="w-8 h-8 text-success" />
               </div>
               <h3 className="text-xl font-semibold mb-2">
-                {language === 'en' ? 'Request Submitted!' : 'கோரிக்கை சமர்ப்பிக்கப்பட்டது!'}
+                {serviceType === 'otp' 
+                  ? (language === 'en' ? 'OTP Service Enabled!' : 'OTP சேவை இயக்கப்பட்டது!')
+                  : (language === 'en' ? 'Request Submitted!' : 'கோரிக்கை சமர்ப்பிக்கப்பட்டது!')}
               </h3>
               <p className="text-muted-foreground mb-4">
-                {language === 'en' 
-                  ? 'Your request has been submitted. You will be notified once approved.'
-                  : 'உங்கள் கோரிக்கை சமர்ப்பிக்கப்பட்டது. அங்கீகரிக்கப்பட்டதும் உங்களுக்கு தெரிவிக்கப்படும்.'}
+                {serviceType === 'otp'
+                  ? (language === 'en' 
+                      ? 'OTP authentication has been enabled for the selected elderly members.'
+                      : 'தேர்ந்தெடுக்கப்பட்ட மூத்த உறுப்பினர்களுக்கு OTP அங்கீகாரம் இயக்கப்பட்டது.')
+                  : (language === 'en' 
+                      ? 'Your request has been submitted. You will be notified once approved.'
+                      : 'உங்கள் கோரிக்கை சமர்ப்பிக்கப்பட்டது. அங்கீகரிக்கப்பட்டதும் உங்களுக்கு தெரிவிக்கப்படும்.')}
               </p>
 
-              {existingRequest && (
+              {serviceType === 'delivery' && existingRequest && (
                 <div className="p-4 bg-muted rounded-lg text-left mb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Truck className="w-5 h-5 text-primary" />
