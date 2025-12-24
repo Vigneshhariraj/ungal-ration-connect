@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, Globe } from 'lucide-react';
+import { ArrowLeft, Bell, Globe, Settings } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,6 +9,7 @@ interface HeaderProps {
   showBack?: boolean;
   showNotification?: boolean;
   showLanguage?: boolean;
+  showSettings?: boolean;
   className?: string;
 }
 
@@ -17,6 +18,7 @@ const Header = ({
   showBack = false,
   showNotification = true,
   showLanguage = true,
+  showSettings = true,
   className,
 }: HeaderProps) => {
   const navigate = useNavigate();
@@ -35,6 +37,15 @@ const Header = ({
     navigate('/notifications');
   };
 
+  const handleSettings = () => {
+    navigate('/profile');
+  };
+
+  // Determine if we should show the back button based on current route
+  const isHomePage = location.pathname === '/dashboard' || location.pathname === '/authority/dashboard';
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/otp-verify';
+  const shouldShowBack = showBack || (!isHomePage && !isLoginPage);
+
   return (
     <header
       className={cn(
@@ -42,8 +53,8 @@ const Header = ({
         className
       )}
     >
-      <div className="flex items-center gap-3">
-        {showBack && (
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {shouldShowBack && (
           <Button
             variant="ghost"
             size="icon"
@@ -56,7 +67,7 @@ const Header = ({
         {title && (
           <h1 className="text-lg font-semibold truncate">{title}</h1>
         )}
-        {!title && !showBack && (
+        {!title && !shouldShowBack && (
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">உR</span>
@@ -66,7 +77,7 @@ const Header = ({
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
         {showLanguage && (
           <Button
             variant="ghost"
@@ -80,7 +91,16 @@ const Header = ({
             </span>
           </Button>
         )}
-        {showNotification && location.pathname !== '/notifications' && (
+        {showSettings && !isLoginPage && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleSettings}
+          >
+            <Settings className="w-5 h-5" />
+          </Button>
+        )}
+        {showNotification && location.pathname !== '/notifications' && !isLoginPage && (
           <Button
             variant="ghost"
             size="icon"

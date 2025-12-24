@@ -10,6 +10,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import LoginPage from "@/pages/auth/LoginPage";
 import OTPVerifyPage from "@/pages/auth/OTPVerifyPage";
 import LinkRationCardPage from "@/pages/auth/LinkRationCardPage";
+import VerifyRationCardPage from "@/pages/auth/VerifyRationCardPage";
 
 // Citizen Pages
 import DashboardPage from "@/pages/citizen/DashboardPage";
@@ -24,12 +25,15 @@ import ProfilePage from "@/pages/citizen/ProfilePage";
 import AuthorityDashboardPage from "@/pages/authority/AuthorityDashboardPage";
 import StockManagementPage from "@/pages/authority/StockManagementPage";
 import DeliveryManagementPage from "@/pages/authority/DeliveryManagementPage";
+import PurchaseAnalyticsPage from "@/pages/authority/PurchaseAnalyticsPage";
+import StockOverviewPage from "@/pages/authority/StockOverviewPage";
+import RedistributionPage from "@/pages/authority/RedistributionPage";
+import OrderAnalysisPage from "@/pages/authority/OrderAnalysisPage";
 
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
 
@@ -52,7 +56,6 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
   return <>{children}</>;
 };
 
-// Public Route Component (redirect if authenticated)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
 
@@ -77,118 +80,25 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Public Routes */}
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <LoginPage />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/otp-verify"
-        element={
-          <PublicRoute>
-            <OTPVerifyPage />
-          </PublicRoute>
-        }
-      />
-
-      {/* Protected Citizen Routes */}
-      <Route
-        path="/link-ration-card"
-        element={
-          <ProtectedRoute>
-            <LinkRationCardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/stocks"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <FoodStocksPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/voting"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <VotingPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/ration"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <RationDetailsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/elder-services"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <ElderServicesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <NotificationsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute allowedRoles={['citizen']}>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Protected Authority Routes */}
-      <Route
-        path="/authority/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={['authority']}>
-            <AuthorityDashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/authority/stocks"
-        element={
-          <ProtectedRoute allowedRoles={['authority']}>
-            <StockManagementPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/authority/deliveries"
-        element={
-          <ProtectedRoute allowedRoles={['authority']}>
-            <DeliveryManagementPage />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Catch-all */}
+      <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/otp-verify" element={<PublicRoute><OTPVerifyPage /></PublicRoute>} />
+      <Route path="/verify-ration-card" element={<VerifyRationCardPage />} />
+      <Route path="/link-ration-card" element={<ProtectedRoute><LinkRationCardPage /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['citizen']}><DashboardPage /></ProtectedRoute>} />
+      <Route path="/stocks" element={<ProtectedRoute allowedRoles={['citizen']}><FoodStocksPage /></ProtectedRoute>} />
+      <Route path="/voting" element={<ProtectedRoute allowedRoles={['citizen']}><VotingPage /></ProtectedRoute>} />
+      <Route path="/ration" element={<ProtectedRoute allowedRoles={['citizen']}><RationDetailsPage /></ProtectedRoute>} />
+      <Route path="/elder-services" element={<ProtectedRoute allowedRoles={['citizen']}><ElderServicesPage /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute allowedRoles={['citizen']}><NotificationsPage /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute allowedRoles={['citizen']}><ProfilePage /></ProtectedRoute>} />
+      <Route path="/authority/dashboard" element={<ProtectedRoute allowedRoles={['authority']}><AuthorityDashboardPage /></ProtectedRoute>} />
+      <Route path="/authority/stocks" element={<ProtectedRoute allowedRoles={['authority']}><StockManagementPage /></ProtectedRoute>} />
+      <Route path="/authority/deliveries" element={<ProtectedRoute allowedRoles={['authority']}><DeliveryManagementPage /></ProtectedRoute>} />
+      <Route path="/authority/purchase-analytics" element={<ProtectedRoute allowedRoles={['authority']}><PurchaseAnalyticsPage /></ProtectedRoute>} />
+      <Route path="/authority/stock-overview" element={<ProtectedRoute allowedRoles={['authority']}><StockOverviewPage /></ProtectedRoute>} />
+      <Route path="/authority/redistribution" element={<ProtectedRoute allowedRoles={['authority']}><RedistributionPage /></ProtectedRoute>} />
+      <Route path="/authority/order-analysis" element={<ProtectedRoute allowedRoles={['authority']}><OrderAnalysisPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
