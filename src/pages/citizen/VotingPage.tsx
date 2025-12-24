@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Vote, Clock, Check, AlertCircle } from 'lucide-react';
+import { Vote, Clock, Check, AlertCircle, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -20,6 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 import { mockFoodItems, mockUserVotes, votingDeadline, simulateApiCall, FoodItem, Vote as VoteType } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 
+type DialogType = 'vote' | 'unvote' | 'resetAll' | null;
+
 const VotingPage = () => {
   const { t, language } = useLanguage();
   const { toast } = useToast();
@@ -27,7 +29,8 @@ const VotingPage = () => {
   const [votingItems, setVotingItems] = useState<FoodItem[]>([]);
   const [userVotes, setUserVotes] = useState<VoteType[]>(mockUserVotes);
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
-  const [isVoting, setIsVoting] = useState(false);
+  const [dialogType, setDialogType] = useState<DialogType>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
@@ -63,7 +66,7 @@ const VotingPage = () => {
   const handleVote = async () => {
     if (!selectedItem) return;
 
-    setIsVoting(true);
+    setIsProcessing(true);
     await simulateApiCall(null, 800);
 
     const newVote: VoteType = {
@@ -89,7 +92,70 @@ const VotingPage = () => {
     });
 
     setSelectedItem(null);
-    setIsVoting(false);
+    setDialogType(null);
+    setIsProcessing(false);
+  };
+
+  const handleUnvote = async () => {
+    if (!selectedItem) return;
+
+    setIsProcessing(true);
+    await simulateApiCall(null, 800);
+
+    setUserVotes(votes => votes.filter(v => v.itemId !== selectedItem.id));
+    setVotingItems(items =>
+      items.map(item =>
+        item.id === selectedItem.id
+          ? { ...item, totalVotes: Math.max(0, item.totalVotes - 1), votePercentage: Math.max(0, ((item.totalVotes - 1) / item.maxVotes) * 100) }
+          : item
+      )
+    );
+
+    toast({
+      title: language === 'en' ? 'Vote Removed' : 'வாக்கு நீக்கப்பட்டது',
+      description: language === 'en' 
+        ? `Your vote for ${selectedItem.name} has been removed.`
+        : `${selectedItem.nameTamil} க்கான உங்கள் வாக்கு நீக்கப்பட்டது.`,
+    });
+
+    setSelectedItem(null);
+    setDialogType(null);
+    setIsProcessing(false);
+  };
+
+  const handleResetAllVotes = async () => {
+    setIsProcessing(true);
+    await simulateApiCall(null, 1000);
+
+    const votedItemIds = userVotes.map(v => v.itemId);
+    setVotingItems(items =>
+      items.map(item =>
+        votedItemIds.includes(item.id)
+          ? { ...item, totalVotes: Math.max(0, item.totalVotes - 1), votePercentage: Math.max(0, ((item.totalVotes - 1) / item.maxVotes) * 100) }
+          : item
+      )
+    );
+    setUserVotes([]);
+
+    toast({
+      title: language === 'en' ? 'All Votes Reset' : 'அனைத்து வாக்குகளும் மீட்டமைக்கப்பட்டன',
+      description: language === 'en' 
+        ? 'All your votes have been removed.'
+        : 'உங்கள் அனைத்து வாக்குகளும் நீக்கப்பட்டன.',
+    });
+
+    setDialogType(null);
+    setIsProcessing(false);
+  };
+
+  const openVoteDialog = (item: FoodItem) => {
+    setSelectedItem(item);
+    setDialogType('vote');
+  };
+
+  const openUnvoteDialog = (item: FoodItem) => {
+    setSelectedItem(item);
+    setDialogType('unvote');
   };
 
   const isItemVoted = (itemId: string) => userVotes.some(v => v.itemId === itemId);
@@ -101,9 +167,14 @@ const VotingPage = () => {
         {/* Countdown Timer */}
         <Card className="gradient-accent text-accent-foreground">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Clock className="w-5 h-5" />
-              <span className="font-medium">{t('voting.deadline')}</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5" />
+                <span className="font-medium">{t('voting.deadline')}</span>
+              </div>
+              <p className="text-xs opacity-80">
+                {language === 'en' ? 'Votes can be changed until deadline' : 'வாக்குகள் காலக்கெடுவரை மாற்றப்படலாம்'}
+              </p>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               {Object.entries(countdown).map(([key, value]) => (
@@ -116,14 +187,25 @@ const VotingPage = () => {
           </CardContent>
         </Card>
 
-        {/* My Votes Section */}
+        {/* My Votes Section with Reset Button */}
         {votedItems.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Check className="w-5 h-5 text-success" />
-                {t('voting.myVotes')} ({votedItems.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Check className="w-5 h-5 text-success" />
+                  {t('voting.myVotes')} ({votedItems.length})
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDialogType('resetAll')}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <RotateCcw className="w-4 h-4 mr-1" />
+                  {language === 'en' ? 'Reset All' : 'அனைத்தையும் மீட்டமை'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -170,25 +252,25 @@ const VotingPage = () => {
                         <p className="text-sm text-muted-foreground">{item.nameTamil}</p>
                         <p className="text-xs text-muted-foreground mt-1">{item.specification}</p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant={voted ? 'outline' : 'default'}
-                        disabled={voted}
-                        onClick={() => setSelectedItem(item)}
-                        className={cn(voted && "border-success text-success")}
-                      >
-                        {voted ? (
-                          <>
-                            <Check className="w-4 h-4 mr-1" />
-                            {t('voting.voted')}
-                          </>
-                        ) : (
-                          <>
-                            <Vote className="w-4 h-4 mr-1" />
-                            {t('voting.vote')}
-                          </>
-                        )}
-                      </Button>
+                      {voted ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openUnvoteDialog(item)}
+                          className="border-accent text-accent hover:bg-accent/10"
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          {language === 'en' ? 'Unvote' : 'வாக்கை நீக்கு'}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => openVoteDialog(item)}
+                        >
+                          <Vote className="w-4 h-4 mr-1" />
+                          {t('voting.vote')}
+                        </Button>
+                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -209,7 +291,7 @@ const VotingPage = () => {
         )}
 
         {/* Vote Confirmation Dialog */}
-        <AlertDialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+        <AlertDialog open={dialogType === 'vote'} onOpenChange={() => { setDialogType(null); setSelectedItem(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
@@ -226,9 +308,79 @@ const VotingPage = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isVoting}>{t('common.cancel')}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleVote} disabled={isVoting}>
-                {isVoting ? t('common.loading') : t('common.confirm')}
+              <AlertDialogCancel disabled={isProcessing}>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleVote} disabled={isProcessing}>
+                {isProcessing ? t('common.loading') : t('common.confirm')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Unvote Confirmation Dialog */}
+        <AlertDialog open={dialogType === 'unvote'} onOpenChange={() => { setDialogType(null); setSelectedItem(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <X className="w-5 h-5 text-accent" />
+                {language === 'en' ? 'Remove Vote' : 'வாக்கை நீக்கு'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === 'en' 
+                  ? `Are you sure you want to remove your vote for "${selectedItem?.name}"?`
+                  : `"${selectedItem?.nameTamil}" க்கான உங்கள் வாக்கை நீக்க விரும்புகிறீர்களா?`}
+                <div className="mt-3 p-3 bg-muted rounded-lg">
+                  <p className="font-semibold text-foreground">{selectedItem?.name}</p>
+                  <p className="text-sm">{selectedItem?.nameTamil}</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isProcessing}>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleUnvote} 
+                disabled={isProcessing}
+                className="bg-accent hover:bg-accent/90"
+              >
+                {isProcessing ? t('common.loading') : (language === 'en' ? 'Remove Vote' : 'நீக்கு')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Reset All Votes Confirmation Dialog */}
+        <AlertDialog open={dialogType === 'resetAll'} onOpenChange={() => setDialogType(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-destructive" />
+                {language === 'en' ? 'Reset All Votes' : 'அனைத்து வாக்குகளையும் மீட்டமை'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === 'en' 
+                  ? `Are you sure you want to reset all ${votedItems.length} votes? This action cannot be undone.`
+                  : `${votedItems.length} வாக்குகளையும் மீட்டமைக்க விரும்புகிறீர்களா? இந்த செயலை மாற்ற முடியாது.`}
+                <div className="mt-3 p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {language === 'en' ? 'Votes to be removed:' : 'நீக்கப்படும் வாக்குகள்:'}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {votedItems.map(item => (
+                      <span key={item.id} className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
+                        {language === 'en' ? item.name : item.nameTamil}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isProcessing}>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleResetAllVotes} 
+                disabled={isProcessing}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                {isProcessing ? t('common.loading') : (language === 'en' ? 'Reset All' : 'மீட்டமை')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
